@@ -1,159 +1,156 @@
--- Coolkid Mode All-in-One Script
+-- Coolkid Test GUI: ТВОЯ КАРТИНКА + ТВОЙ ЗВУК
+-- ID картинки: 118652198574158
+-- ID звука: 119729923584444
+
 local Players = game:GetService("Players")
-local Lighting = game:GetService("Lighting")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
-local camera = Workspace.CurrentCamera
+local Debris = game:GetService("Debris")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Настройки
-local coolkidTexture = "rbxassetid://6688864505"
-local coolkidMusic = "rbxassetid://1839241117"
-local soundEffects = {
-	"rbxassetid://1840453315",
-	"rbxassetid://1840468435",
-	"rbxassetid://1839241117"
-}
+-- ТВОЯ КАРТИНКА COOLKID
+local COOLKID_IMAGE_ID = "rbxassetid://118652198574158"
 
-local particleTexture = "rbxassetid://243098098"
-local coolkidOn = false
-local music
+-- ТВОЙ ЗВУК COOLKID
+local COOLKID_SOUND_ID = "rbxassetid://119729923584444"
 
--- Создаём RemoteEvents если их нет
-local function getOrCreateRemote(name)
-	local obj = ReplicatedStorage:FindFirstChild(name)
-	if not obj then
-		obj = Instance.new("RemoteEvent")
-		obj.Name = name
-		obj.Parent = ReplicatedStorage
-	end
-	return obj
-end
+-- СОСТОЯНИЯ
+local textureEnabled = false
+local soundEnabled = false
+local currentSound = nil
 
-local shakeEvent = getOrCreateRemote("CoolkidShake")
-local guiEvent = getOrCreateRemote("CoolkidShowMessage")
-local nameTagEvent = getOrCreateRemote("CoolkidNameTag")
-local playSoundEvent = getOrCreateRemote("CoolkidPlaySound")
+-- GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CoolkidTestGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
 
--- Функции
-local function setCoolkidTextures(enable)
-	for _, obj in ipairs(Workspace:GetDescendants()) do
-		if obj:IsA("Texture") or obj:IsA("Decal") then
-			obj.Texture = enable and coolkidTexture or ""
-		elseif obj:IsA("MeshPart") then
-			obj.TextureID = enable and coolkidTexture or ""
-		elseif obj:IsA("SpecialMesh") then
-			obj.TextureId = enable and coolkidTexture or ""
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 180)
+frame.Position = UDim2.new(0, 10, 0.5, -90)
+frame.BackgroundColor3 = Color3.new(0, 0, 0)
+frame.BackgroundTransparency = 0.3
+frame.BorderSizePixel = 2
+frame.BorderColor3 = Color3.new(1, 1, 0)
+frame.Parent = screenGui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Text = "COOLKID TEST"
+title.TextColor3 = Color3.new(1, 1, 0)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBlack
+title.TextScaled = true
+title.Parent = frame
+
+-- КНОПКА: ТЕКСТУРЫ
+local textureBtn = Instance.new("TextButton")
+textureBtn.Size = UDim2.new(0.9, 0, 0, 40)
+textureBtn.Position = UDim2.new(0.05, 0, 0, 50)
+textureBtn.Text = "TEXTURES: OFF"
+textureBtn.TextColor3 = Color3.new(0, 0, 0)
+textureBtn.BackgroundColor3 = Color3.new(1, 0, 0)
+textureBtn.Font = Enum.Font.GothamBold
+textureBtn.TextScaled = true
+textureBtn.Parent = frame
+
+-- КНОПКА: ЗВУК
+local soundBtn = Instance.new("TextButton")
+soundBtn.Size = UDim2.new(0.9, 0, 0, 40)
+soundBtn.Position = UDim2.new(0.05, 0, 0, 100)
+soundBtn.Text = "SOUND: OFF"
+soundBtn.TextColor3 = Color3.new(0, 0, 0)
+soundBtn.BackgroundColor3 = Color3.new(1, 0, 0)
+soundBtn.Font = Enum.Font.GothamBold
+soundBtn.TextScaled = true
+soundBtn.Parent = frame
+
+-- КНОПКА: ОЧИСТКА
+local clearBtn = Instance.new("TextButton")
+clearBtn.Size = UDim2.new(0.9, 0, 0, 35)
+clearBtn.Position = UDim2.new(0.05, 0, 0, 145)
+clearBtn.Text = "CLEAR ALL"
+clearBtn.TextColor3 = Color3.new(1, 1, 1)
+clearBtn.BackgroundColor3 = Color3.new(0.7, 0, 0)
+clearBtn.Font = Enum.Font.GothamBold
+clearBtn.TextScaled = true
+clearBtn.Parent = frame
+
+-- ПРИМЕНИТЬ ТЕКСТУРЫ
+local function applyTextures(enable)
+	textureEnabled = enable
+	textureBtn.Text = "TEXTURES: " .. (enable and "ON" or "OFF")
+	textureBtn.BackgroundColor3 = enable and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
+
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if obj:IsA("BasePart") or obj:IsA("MeshPart") then
+			-- Удаляем старые декали
+			for _, child in ipairs(obj:GetChildren()) do
+				if child:IsA("Decal") then
+					child:Destroy()
+				end
+			end
+
+			if enable then
+				-- Добавляем твою картинку на все грани
+				for _, face in ipairs(Enum.NormalId:GetEnumItems()) do
+					local decal = Instance.new("Decal")
+					decal.Texture = COOLKID_IMAGE_ID
+					decal.Face = face
+					decal.Transparency = 0
+					decal.Parent = obj
+				end
+			end
 		end
 	end
 end
 
-local function flashingLighting()
-	while coolkidOn do
-		Lighting.Ambient = Color3.fromRGB(math.random(150,255), math.random(100,255), 0)
-		Lighting.OutdoorAmbient = Color3.fromRGB(math.random(150,255), math.random(100,255), 0)
-		task.wait(0.2)
-	end
-end
+-- ЗВУК (твой ID)
+local function toggleSound()
+	soundEnabled = not soundEnabled
+	soundBtn.Text = "SOUND: " .. (soundEnabled and "ON" or "OFF")
+	soundBtn.BackgroundColor3 = soundEnabled and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
 
-local function playMusic()
-	if music then return end
-	music = Instance.new("Sound")
-	music.SoundId = coolkidMusic
-	music.Looped = true
-	music.Volume = 5
-	music.Parent = Workspace
-	music:Play()
-end
+	if soundEnabled then
+		spawn(function()
+			while soundEnabled do
+				-- Останавливаем старый
+				if currentSound and currentSound.Parent then
+					currentSound:Stop()
+					currentSound:Destroy()
+				end
 
-local function stopMusic()
-	if music then
-		music:Stop()
-		music:Destroy()
-		music = nil
-	end
-end
+				-- Новый звук
+				currentSound = Instance.new("Sound")
+				currentSound.SoundId = COOLKID_SOUND_ID
+				currentSound.Volume = 8
+				currentSound.Looped = false
+				currentSound.Parent = workspace
+				currentSound:Play()
 
-local function createParticles()
-	for _,p in ipairs(Players:GetPlayers()) do
-		if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-			local emitter = Instance.new("ParticleEmitter")
-			emitter.Texture = particleTexture
-			emitter.Rate = 200
-			emitter.Lifetime = NumberRange.new(0.5,1)
-			emitter.Speed = NumberRange.new(5,10)
-			emitter.Parent = p.Character.HumanoidRootPart
-			task.delay(5, function()
-				emitter.Enabled = false
-				task.wait(1)
-				if emitter then emitter:Destroy() end
-			end)
+				-- Ждём окончания
+				currentSound.Ended:Wait()
+			end
+		end)
+	else
+		if currentSound then
+			currentSound:Stop()
+			currentSound:Destroy()
+			currentSound = nil
 		end
 	end
 end
 
-local function showScreenMessage(text)
-	for _, p in ipairs(Players:GetPlayers()) do
-		guiEvent:FireClient(p, text)
-	end
+-- ОЧИСТКА
+local function clearAll()
+	applyTextures(false)
+	if soundEnabled then toggleSound() end
 end
 
-local function setNameTags(enable)
-	for _, p in ipairs(Players:GetPlayers()) do
-		nameTagEvent:FireClient(p, enable)
-	end
-end
+-- ПОДКЛЮЧЕНИЕ КНОПОК
+textureBtn.MouseButton1Click:Connect(function()
+	applyTextures(not textureEnabled)
+end)
 
-local function playRandomSound()
-	for _, p in ipairs(Players:GetPlayers()) do
-		local sId = soundEffects[math.random(1,#soundEffects)]
-		playSoundEvent:FireClient(p, sId)
-	end
-end
+soundBtn.MouseButton1Click:Connect(toggleSound)
 
-local function enableCoolkid()
-	if coolkidOn then return end
-	coolkidOn = true
-	setCoolkidTextures(true)
-	playMusic()
-	showScreenMessage("COOLKID MODE ACTIVATED")
-	setNameTags(true)
-	createParticles()
-	task.spawn(flashingLighting)
-	for _, p in ipairs(Players:GetPlayers()) do
-		shakeEvent:FireClient(p, true)
-	end
-end
-
-local function disableCoolkid()
-	if not coolkidOn then return end
-	coolkidOn = false
-	setCoolkidTextures(false)
-	stopMusic()
-	Lighting.Ambient = Color3.fromRGB(127,127,127)
-	Lighting.OutdoorAmbient = Color3.fromRGB(127,127,127)
-	showScreenMessage("COOLKID MODE DEACTIVATED")
-	setNameTags(false)
-	for _, p in ipairs(Players:GetPlayers()) do
-		shakeEvent:FireClient(p, false)
-	end
-end
-
--- Команды в чате
-local function connectPlayer(plr)
-	plr.Chatted:Connect(function(msg)
-		msg = msg:lower()
-		if msg == "/coolkid on" then
-			enableCoolkid()
-		elseif msg == "/coolkid off" then
-			disableCoolkid()
-		elseif msg == "/coolkid sound" then
-			playRandomSound()
-		end
-	end)
-end
-
-Players.PlayerAdded:Connect(connectPlayer)
-for _,p in ipairs(Players:GetPlayers()) do
-	connectPlayer(p)
-end
+clearBtn.MouseButton1Click:Connect(clearAll)
