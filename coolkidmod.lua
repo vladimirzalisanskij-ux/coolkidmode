@@ -1,22 +1,16 @@
--- Coolkid Test GUI: ТВОЯ КАРТИНКА + ТВОЙ ЗВУК
--- ID картинки: 118652198574158
--- ID звука: 119729923584444
-
+-- CoolkidGUI: ТОЛЬКО У ТЕБЯ (тестовая панель)
 local Players = game:GetService("Players")
-local Debris = game:GetService("Debris")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- ТВОЯ КАРТИНКА COOLKID
-local COOLKID_IMAGE_ID = "rbxassetid://118652198574158"
-
--- ТВОЙ ЗВУК COOLKID
-local COOLKID_SOUND_ID = "rbxassetid://119729923584444"
+-- RemoteEvents
+local textureEvent = ReplicatedStorage:WaitForChild("CoolkidTextureEvent")
+local soundEvent = ReplicatedStorage:WaitForChild("CoolkidSoundEvent")
 
 -- СОСТОЯНИЯ
-local textureEnabled = false
-local soundEnabled = false
-local currentSound = nil
+local textureOn = false
+local soundOn = false
 
 -- GUI
 local screenGui = Instance.new("ScreenGui")
@@ -35,7 +29,7 @@ frame.Parent = screenGui
 
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 40)
-title.Text = "COOLKID TEST"
+title.Text = "COOLKID CONTROL"
 title.TextColor3 = Color3.new(1, 1, 0)
 title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBlack
@@ -75,82 +69,38 @@ clearBtn.Font = Enum.Font.GothamBold
 clearBtn.TextScaled = true
 clearBtn.Parent = frame
 
--- ПРИМЕНИТЬ ТЕКСТУРЫ
-local function applyTextures(enable)
-	textureEnabled = enable
-	textureBtn.Text = "TEXTURES: " .. (enable and "ON" or "OFF")
-	textureBtn.BackgroundColor3 = enable and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
-
-	for _, obj in ipairs(workspace:GetDescendants()) do
-		if obj:IsA("BasePart") or obj:IsA("MeshPart") then
-			-- Удаляем старые декали
-			for _, child in ipairs(obj:GetChildren()) do
-				if child:IsA("Decal") then
-					child:Destroy()
-				end
-			end
-
-			if enable then
-				-- Добавляем твою картинку на все грани
-				for _, face in ipairs(Enum.NormalId:GetEnumItems()) do
-					local decal = Instance.new("Decal")
-					decal.Texture = COOLKID_IMAGE_ID
-					decal.Face = face
-					decal.Transparency = 0
-					decal.Parent = obj
-				end
-			end
-		end
-	end
-end
-
--- ЗВУК (твой ID)
-local function toggleSound()
-	soundEnabled = not soundEnabled
-	soundBtn.Text = "SOUND: " .. (soundEnabled and "ON" or "OFF")
-	soundBtn.BackgroundColor3 = soundEnabled and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
-
-	if soundEnabled then
-		spawn(function()
-			while soundEnabled do
-				-- Останавливаем старый
-				if currentSound and currentSound.Parent then
-					currentSound:Stop()
-					currentSound:Destroy()
-				end
-
-				-- Новый звук
-				currentSound = Instance.new("Sound")
-				currentSound.SoundId = COOLKID_SOUND_ID
-				currentSound.Volume = 8
-				currentSound.Looped = false
-				currentSound.Parent = workspace
-				currentSound:Play()
-
-				-- Ждём окончания
-				currentSound.Ended:Wait()
-			end
-		end)
-	else
-		if currentSound then
-			currentSound:Stop()
-			currentSound:Destroy()
-			currentSound = nil
-		end
-	end
-end
-
--- ОЧИСТКА
-local function clearAll()
-	applyTextures(false)
-	if soundEnabled then toggleSound() end
-end
-
--- ПОДКЛЮЧЕНИЕ КНОПОК
+-- === ТЕКСТУРЫ ===
 textureBtn.MouseButton1Click:Connect(function()
-	applyTextures(not textureEnabled)
+	textureOn = not textureOn
+	textureBtn.Text = "TEXTURES: " .. (textureOn and "ON" or "OFF")
+	textureBtn.BackgroundColor3 = textureOn and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
+	
+	-- Отправляем на сервер → все видят
+	textureEvent:FireServer(textureOn)
 end)
 
-soundBtn.MouseButton1Click:Connect(toggleSound)
+-- === ЗВУК ===
+soundBtn.MouseButton1Click:Connect(function()
+	soundOn = not soundOn
+	soundBtn.Text = "SOUND: " .. (soundOn and "ON" or "OFF")
+	soundBtn.BackgroundColor3 = soundOn and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
+	
+	-- Отправляем на сервер → все слышат
+	soundEvent:FireServer(soundOn)
+end)
 
-clearBtn.MouseButton1Click:Connect(clearAll)
+-- === ОЧИСТКА ===
+clearBtn.MouseButton1Click:Connect(function()
+	if textureOn then
+		textureOn = false
+		textureBtn.Text = "TEXTURES: OFF"
+		textureBtn.BackgroundColor3 = Color3.new(1, 0, 0)
+		textureEvent:FireServer(false)
+	end
+	if soundOn then
+		soundOn = false
+		soundBtn.Text = "SOUND: OFF"
+		soundBtn.BackgroundColor3 = Color3.new(1, 0, 0)
+		soundEvent:FireServer(false)
+	end
+end)
