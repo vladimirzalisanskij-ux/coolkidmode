@@ -1,106 +1,159 @@
--- CoolkidGUI: ТОЛЬКО У ТЕБЯ (тестовая панель)
+-- Coolkid Mode All-in-One Script
 local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local camera = Workspace.CurrentCamera
 
--- RemoteEvents
-local textureEvent = ReplicatedStorage:WaitForChild("CoolkidTextureEvent")
-local soundEvent = ReplicatedStorage:WaitForChild("CoolkidSoundEvent")
+-- Настройки
+local coolkidTexture = "rbxassetid://6688864505"
+local coolkidMusic = "rbxassetid://1839241117"
+local soundEffects = {
+	"rbxassetid://1840453315",
+	"rbxassetid://1840468435",
+	"rbxassetid://1839241117"
+}
 
--- СОСТОЯНИЯ
-local textureOn = false
-local soundOn = false
+local particleTexture = "rbxassetid://243098098"
+local coolkidOn = false
+local music
 
--- GUI
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "CoolkidTestGUI"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = PlayerGui
-
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 180)
-frame.Position = UDim2.new(0, 10, 0.5, -90)
-frame.BackgroundColor3 = Color3.new(0, 0, 0)
-frame.BackgroundTransparency = 0.3
-frame.BorderSizePixel = 2
-frame.BorderColor3 = Color3.new(1, 1, 0)
-frame.Parent = screenGui
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 40)
-title.Text = "COOLKID CONTROL"
-title.TextColor3 = Color3.new(1, 1, 0)
-title.BackgroundTransparency = 1
-title.Font = Enum.Font.GothamBlack
-title.TextScaled = true
-title.Parent = frame
-
--- КНОПКА: ТЕКСТУРЫ
-local textureBtn = Instance.new("TextButton")
-textureBtn.Size = UDim2.new(0.9, 0, 0, 40)
-textureBtn.Position = UDim2.new(0.05, 0, 0, 50)
-textureBtn.Text = "TEXTURES: OFF"
-textureBtn.TextColor3 = Color3.new(0, 0, 0)
-textureBtn.BackgroundColor3 = Color3.new(1, 0, 0)
-textureBtn.Font = Enum.Font.GothamBold
-textureBtn.TextScaled = true
-textureBtn.Parent = frame
-
--- КНОПКА: ЗВУК
-local soundBtn = Instance.new("TextButton")
-soundBtn.Size = UDim2.new(0.9, 0, 0, 40)
-soundBtn.Position = UDim2.new(0.05, 0, 0, 100)
-soundBtn.Text = "SOUND: OFF"
-soundBtn.TextColor3 = Color3.new(0, 0, 0)
-soundBtn.BackgroundColor3 = Color3.new(1, 0, 0)
-soundBtn.Font = Enum.Font.GothamBold
-soundBtn.TextScaled = true
-soundBtn.Parent = frame
-
--- КНОПКА: ОЧИСТКА
-local clearBtn = Instance.new("TextButton")
-clearBtn.Size = UDim2.new(0.9, 0, 0, 35)
-clearBtn.Position = UDim2.new(0.05, 0, 0, 145)
-clearBtn.Text = "CLEAR ALL"
-clearBtn.TextColor3 = Color3.new(1, 1, 1)
-clearBtn.BackgroundColor3 = Color3.new(0.7, 0, 0)
-clearBtn.Font = Enum.Font.GothamBold
-clearBtn.TextScaled = true
-clearBtn.Parent = frame
-
--- === ТЕКСТУРЫ ===
-textureBtn.MouseButton1Click:Connect(function()
-	textureOn = not textureOn
-	textureBtn.Text = "TEXTURES: " .. (textureOn and "ON" or "OFF")
-	textureBtn.BackgroundColor3 = textureOn and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
-	
-	-- Отправляем на сервер → все видят
-	textureEvent:FireServer(textureOn)
-end)
-
--- === ЗВУК ===
-soundBtn.MouseButton1Click:Connect(function()
-	soundOn = not soundOn
-	soundBtn.Text = "SOUND: " .. (soundOn and "ON" or "OFF")
-	soundBtn.BackgroundColor3 = soundOn and Color3.new(0, 1, 0) or Color3.new(1, 0, 0)
-	
-	-- Отправляем на сервер → все слышат
-	soundEvent:FireServer(soundOn)
-end)
-
--- === ОЧИСТКА ===
-clearBtn.MouseButton1Click:Connect(function()
-	if textureOn then
-		textureOn = false
-		textureBtn.Text = "TEXTURES: OFF"
-		textureBtn.BackgroundColor3 = Color3.new(1, 0, 0)
-		textureEvent:FireServer(false)
+-- Создаём RemoteEvents если их нет
+local function getOrCreateRemote(name)
+	local obj = ReplicatedStorage:FindFirstChild(name)
+	if not obj then
+		obj = Instance.new("RemoteEvent")
+		obj.Name = name
+		obj.Parent = ReplicatedStorage
 	end
-	if soundOn then
-		soundOn = false
-		soundBtn.Text = "SOUND: OFF"
-		soundBtn.BackgroundColor3 = Color3.new(1, 0, 0)
-		soundEvent:FireServer(false)
+	return obj
+end
+
+local shakeEvent = getOrCreateRemote("CoolkidShake")
+local guiEvent = getOrCreateRemote("CoolkidShowMessage")
+local nameTagEvent = getOrCreateRemote("CoolkidNameTag")
+local playSoundEvent = getOrCreateRemote("CoolkidPlaySound")
+
+-- Функции
+local function setCoolkidTextures(enable)
+	for _, obj in ipairs(Workspace:GetDescendants()) do
+		if obj:IsA("Texture") or obj:IsA("Decal") then
+			obj.Texture = enable and coolkidTexture or ""
+		elseif obj:IsA("MeshPart") then
+			obj.TextureID = enable and coolkidTexture or ""
+		elseif obj:IsA("SpecialMesh") then
+			obj.TextureId = enable and coolkidTexture or ""
+		end
 	end
-end)
+end
+
+local function flashingLighting()
+	while coolkidOn do
+		Lighting.Ambient = Color3.fromRGB(math.random(150,255), math.random(100,255), 0)
+		Lighting.OutdoorAmbient = Color3.fromRGB(math.random(150,255), math.random(100,255), 0)
+		task.wait(0.2)
+	end
+end
+
+local function playMusic()
+	if music then return end
+	music = Instance.new("Sound")
+	music.SoundId = coolkidMusic
+	music.Looped = true
+	music.Volume = 5
+	music.Parent = Workspace
+	music:Play()
+end
+
+local function stopMusic()
+	if music then
+		music:Stop()
+		music:Destroy()
+		music = nil
+	end
+end
+
+local function createParticles()
+	for _,p in ipairs(Players:GetPlayers()) do
+		if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+			local emitter = Instance.new("ParticleEmitter")
+			emitter.Texture = particleTexture
+			emitter.Rate = 200
+			emitter.Lifetime = NumberRange.new(0.5,1)
+			emitter.Speed = NumberRange.new(5,10)
+			emitter.Parent = p.Character.HumanoidRootPart
+			task.delay(5, function()
+				emitter.Enabled = false
+				task.wait(1)
+				if emitter then emitter:Destroy() end
+			end)
+		end
+	end
+end
+
+local function showScreenMessage(text)
+	for _, p in ipairs(Players:GetPlayers()) do
+		guiEvent:FireClient(p, text)
+	end
+end
+
+local function setNameTags(enable)
+	for _, p in ipairs(Players:GetPlayers()) do
+		nameTagEvent:FireClient(p, enable)
+	end
+end
+
+local function playRandomSound()
+	for _, p in ipairs(Players:GetPlayers()) do
+		local sId = soundEffects[math.random(1,#soundEffects)]
+		playSoundEvent:FireClient(p, sId)
+	end
+end
+
+local function enableCoolkid()
+	if coolkidOn then return end
+	coolkidOn = true
+	setCoolkidTextures(true)
+	playMusic()
+	showScreenMessage("COOLKID MODE ACTIVATED")
+	setNameTags(true)
+	createParticles()
+	task.spawn(flashingLighting)
+	for _, p in ipairs(Players:GetPlayers()) do
+		shakeEvent:FireClient(p, true)
+	end
+end
+
+local function disableCoolkid()
+	if not coolkidOn then return end
+	coolkidOn = false
+	setCoolkidTextures(false)
+	stopMusic()
+	Lighting.Ambient = Color3.fromRGB(127,127,127)
+	Lighting.OutdoorAmbient = Color3.fromRGB(127,127,127)
+	showScreenMessage("COOLKID MODE DEACTIVATED")
+	setNameTags(false)
+	for _, p in ipairs(Players:GetPlayers()) do
+		shakeEvent:FireClient(p, false)
+	end
+end
+
+-- Команды в чате
+local function connectPlayer(plr)
+	plr.Chatted:Connect(function(msg)
+		msg = msg:lower()
+		if msg == "/coolkid on" then
+			enableCoolkid()
+		elseif msg == "/coolkid off" then
+			disableCoolkid()
+		elseif msg == "/coolkid sound" then
+			playRandomSound()
+		end
+	end)
+end
+
+Players.PlayerAdded:Connect(connectPlayer)
+for _,p in ipairs(Players:GetPlayers()) do
+	connectPlayer(p)
+end
